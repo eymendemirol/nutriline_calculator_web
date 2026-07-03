@@ -14,6 +14,7 @@ import {
   createIngredient,
   formatNumber,
 } from "@/lib/calc";
+import { downloadRecipeCsv } from "@/lib/csv";
 import { formatThousands, handleFormattedNumberChange } from "@/lib/format";
 import { shareOrDownloadPdf } from "@/lib/pdf";
 
@@ -68,6 +69,15 @@ export default function Home() {
     }
   }
 
+  function handleCsvExport() {
+    setShareError(null);
+    try {
+      downloadRecipeCsv(ingredients, settings, recipeName);
+    } catch {
+      setShareError("CSV dosyası oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.");
+    }
+  }
+
   return (
     <div className="min-h-full bg-zinc-50">
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
@@ -119,6 +129,7 @@ export default function Home() {
               onShare={handleShare}
               sharing={sharing}
               shareError={shareError}
+              onCsvExport={handleCsvExport}
             />
             <SummaryCard
               toplamHammadde={toplamHammadde}
@@ -362,28 +373,42 @@ function ReportCard({
   onShare,
   sharing,
   shareError,
+  onCsvExport,
 }: {
   ingredients: Ingredient[];
   results: ReturnType<typeof calculateRecipe>["results"];
   onShare: () => void;
   sharing: boolean;
   shareError: string | null;
+  onCsvExport: () => void;
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-zinc-900">Reçete Raporu</h2>
-        <button
-          type="button"
-          onClick={onShare}
-          disabled={sharing}
-          className="rounded-lg border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
-        >
-          {sharing ? "Hazırlanıyor..." : "PDF Olarak İndir / Paylaş"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onCsvExport}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            SCADA İçin CSV Dışa Aktar
+          </button>
+          <button
+            type="button"
+            onClick={onShare}
+            disabled={sharing}
+            className="rounded-lg border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+          >
+            {sharing ? "Hazırlanıyor..." : "PDF Olarak İndir / Paylaş"}
+          </button>
+        </div>
       </div>
       <p className="mb-4 text-sm text-zinc-500">
-        Girilen tüm etken maddelere göre hesaplanan hammadde miktarları.
+        Girilen tüm etken maddelere göre hesaplanan hammadde miktarları. CSV çıktısı,
+        yem tartım/dozaj sistemlerinde yaygın kullanılan reçete formatına uygun
+        hazırlanmıştır; SCADA programınıza içe aktarırken sütun eşleştirmesini
+        kontrol edin.
       </p>
       {shareError && (
         <p className="mb-3 text-sm text-red-600">{shareError}</p>
