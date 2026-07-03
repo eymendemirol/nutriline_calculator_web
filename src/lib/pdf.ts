@@ -6,6 +6,7 @@ import {
   UNIT_LABELS,
   calculateRecipe,
   formatNumber,
+  getCarrierLabel,
 } from "./calc";
 import { formatThousands } from "./format";
 
@@ -72,7 +73,8 @@ export function sanitizeFilename(name: string): string {
 export async function buildRecipePdf(
   ingredients: Ingredient[],
   settings: RecipeSettings,
-  recipeName: string
+  recipeName: string,
+  carrierName: string
 ): Promise<Blob> {
   const { results, toplamHammadde, tasiyici, totalKg } = calculateRecipe(
     ingredients,
@@ -131,17 +133,27 @@ export async function buildRecipePdf(
         "Reçetedeki Oranı",
       ],
     ],
-    body: results.map((r, i) => {
-      const ing = ingredients[i];
-      return [
-        String(i + 1),
-        r.name,
-        `${formatThousands(ing.amount) || "0"} ${UNIT_LABELS[ing.amountUnit]}`,
-        `%${ing.purity || "0"}`,
-        formatNumber(r.amountKg),
-        `%${formatNumber(r.sharePercent, 2)}`,
-      ];
-    }),
+    body: [
+      ...results.map((r, i) => {
+        const ing = ingredients[i];
+        return [
+          String(i + 1),
+          r.name,
+          `${formatThousands(ing.amount) || "0"} ${UNIT_LABELS[ing.amountUnit]}`,
+          `%${ing.purity || "0"}`,
+          formatNumber(r.amountKg),
+          `%${formatNumber(r.sharePercent, 2)}`,
+        ];
+      }),
+      [
+        String(results.length + 1),
+        getCarrierLabel(carrierName),
+        "-",
+        "-",
+        formatNumber(tasiyici),
+        `%${formatNumber(totalKg > 0 ? (tasiyici / totalKg) * 100 : 0, 2)}`,
+      ],
+    ],
     styles: { fontSize: 9, cellPadding: 3, font: fontFamily },
     headStyles: { fillColor: [13, 116, 108], textColor: 255, font: fontFamily, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [242, 247, 246] },
@@ -183,9 +195,10 @@ export async function buildRecipePdf(
 export async function shareOrDownloadPdf(
   ingredients: Ingredient[],
   settings: RecipeSettings,
-  recipeName: string
+  recipeName: string,
+  carrierName: string
 ): Promise<void> {
-  const blob = await buildRecipePdf(ingredients, settings, recipeName);
+  const blob = await buildRecipePdf(ingredients, settings, recipeName, carrierName);
   const filename = `${sanitizeFilename(recipeName)}.pdf`;
   const file = new File([blob], filename, { type: "application/pdf" });
 

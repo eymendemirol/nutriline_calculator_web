@@ -1,4 +1,10 @@
-import { Ingredient, RecipeSettings, calculateRecipe, formatNumber } from "./calc";
+import {
+  Ingredient,
+  RecipeSettings,
+  calculateRecipe,
+  formatNumber,
+  getCarrierLabel,
+} from "./calc";
 import { sanitizeFilename } from "./pdf";
 
 // Yem tartım/dozaj (SCADA) sistemlerinde reçete içe aktarma için yaygın kullanılan
@@ -12,7 +18,8 @@ import { sanitizeFilename } from "./pdf";
 export function buildRecipeCsv(
   ingredients: Ingredient[],
   settings: RecipeSettings,
-  recipeName: string
+  recipeName: string,
+  carrierName: string
 ): string {
   const { results, totalKg, toplamHammadde, tasiyici } = calculateRecipe(
     ingredients,
@@ -33,7 +40,7 @@ export function buildRecipeCsv(
 
   const tasiyiciSharePercent = totalKg > 0 ? (tasiyici / totalKg) * 100 : 0;
   lines.push(
-    `${results.length + 1};Tasiyici (Dolgu);${formatNumber(tasiyici)};${formatNumber(tasiyiciSharePercent, 2)}`
+    `${results.length + 1};${getCarrierLabel(carrierName)};${formatNumber(tasiyici)};${formatNumber(tasiyiciSharePercent, 2)}`
   );
 
   lines.push("");
@@ -46,9 +53,10 @@ export function buildRecipeCsv(
 export function downloadRecipeCsv(
   ingredients: Ingredient[],
   settings: RecipeSettings,
-  recipeName: string
+  recipeName: string,
+  carrierName: string
 ): void {
-  const csv = buildRecipeCsv(ingredients, settings, recipeName);
+  const csv = buildRecipeCsv(ingredients, settings, recipeName, carrierName);
   // Excel/Windows'ta Türkçe karakterlerin doğru görünmesi için UTF-8 BOM ekleniyor.
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
   const filename = `${sanitizeFilename(recipeName)}.csv`;

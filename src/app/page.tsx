@@ -13,6 +13,7 @@ import {
   calculateRecipe,
   createIngredient,
   formatNumber,
+  getCarrierLabel,
 } from "@/lib/calc";
 import { downloadRecipeCsv } from "@/lib/csv";
 import { formatThousands, handleFormattedNumberChange } from "@/lib/format";
@@ -26,6 +27,7 @@ const fieldLabelClass = "mb-1 block text-sm font-medium text-zinc-700";
 
 export default function Home() {
   const [recipeName, setRecipeName] = useState("");
+  const [carrierName, setCarrierName] = useState("");
   const [settings, setSettings] = useState<RecipeSettings>({
     baseAmount: "2",
     baseUnit: "kg",
@@ -61,7 +63,7 @@ export default function Home() {
     setShareError(null);
     setSharing(true);
     try {
-      await shareOrDownloadPdf(ingredients, settings, recipeName);
+      await shareOrDownloadPdf(ingredients, settings, recipeName, carrierName);
     } catch {
       setShareError("Rapor oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.");
     } finally {
@@ -72,7 +74,7 @@ export default function Home() {
   function handleCsvExport() {
     setShareError(null);
     try {
-      downloadRecipeCsv(ingredients, settings, recipeName);
+      downloadRecipeCsv(ingredients, settings, recipeName, carrierName);
     } catch {
       setShareError("CSV dosyası oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.");
     }
@@ -112,7 +114,12 @@ export default function Home() {
           </p>
         </section>
 
-        <SettingsCard settings={settings} onChange={setSettings} />
+        <SettingsCard
+          settings={settings}
+          onChange={setSettings}
+          carrierName={carrierName}
+          onCarrierNameChange={setCarrierName}
+        />
 
         <IngredientsCard
           ingredients={ingredients}
@@ -126,6 +133,9 @@ export default function Home() {
             <ReportCard
               ingredients={ingredients}
               results={results}
+              tasiyici={tasiyici}
+              totalKg={totalKg}
+              carrierLabel={getCarrierLabel(carrierName)}
               onShare={handleShare}
               sharing={sharing}
               shareError={shareError}
@@ -136,6 +146,7 @@ export default function Home() {
               tasiyici={tasiyici}
               totalKg={totalKg}
               tasiyiciNegatif={tasiyiciNegatif}
+              carrierLabel={getCarrierLabel(carrierName)}
             />
           </>
         )}
@@ -147,9 +158,13 @@ export default function Home() {
 function SettingsCard({
   settings,
   onChange,
+  carrierName,
+  onCarrierNameChange,
 }: {
   settings: RecipeSettings;
   onChange: (s: RecipeSettings) => void;
+  carrierName: string;
+  onCarrierNameChange: (name: string) => void;
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
@@ -234,6 +249,21 @@ function SettingsCard({
           </div>
         </div>
       </div>
+      <div className="mt-4">
+        <label className={fieldLabelClass}>Taşıyıcı Madde Adı (opsiyonel)</label>
+        <input
+          type="text"
+          placeholder="Örn: Mısır Unu, Kepek..."
+          value={carrierName}
+          onChange={(e) => onCarrierNameChange(e.target.value)}
+          className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+        <p className="mt-1 text-xs text-zinc-400">
+          Boş bırakılırsa raporda ve PDF&apos;te sadece &quot;Taşıyıcı&quot; yazılır;
+          doldurursanız &quot;Taşıyıcı({carrierName.trim() || "..."})&quot; şeklinde
+          gösterilir.
+        </p>
+      </div>
     </section>
   );
 }
@@ -251,12 +281,12 @@ function IngredientsCard({
 }) {
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-zinc-900">Etken Maddeler</h2>
         <button
           type="button"
           onClick={onAdd}
-          className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+          className="w-full shrink-0 rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800 sm:w-auto"
         >
           + Etken Madde Ekle
         </button>
@@ -282,6 +312,13 @@ function IngredientsCard({
               onChange={(patch) => onChange(ing.id, patch)}
             />
           ))}
+          <button
+            type="button"
+            onClick={onAdd}
+            className="w-full rounded-lg border border-dashed border-teal-700 px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50"
+          >
+            + Etken Madde Ekle
+          </button>
         </div>
       )}
     </section>
@@ -370,6 +407,9 @@ function IngredientRow({
 function ReportCard({
   ingredients,
   results,
+  tasiyici,
+  totalKg,
+  carrierLabel,
   onShare,
   sharing,
   shareError,
@@ -377,20 +417,25 @@ function ReportCard({
 }: {
   ingredients: Ingredient[];
   results: ReturnType<typeof calculateRecipe>["results"];
+  tasiyici: number;
+  totalKg: number;
+  carrierLabel: string;
   onShare: () => void;
   sharing: boolean;
   shareError: string | null;
   onCsvExport: () => void;
 }) {
+  const carrierSharePercent = totalKg > 0 ? (tasiyici / totalKg) * 100 : 0;
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-zinc-900">Reçete Raporu</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
             type="button"
             onClick={onCsvExport}
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+            className="w-full rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 sm:w-auto"
           >
             SCADA İçin CSV Dışa Aktar
           </button>
@@ -398,7 +443,7 @@ function ReportCard({
             type="button"
             onClick={onShare}
             disabled={sharing}
-            className="rounded-lg border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+            className="w-full rounded-lg border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50 sm:w-auto"
           >
             {sharing ? "Hazırlanıyor..." : "PDF Olarak İndir / Paylaş"}
           </button>
@@ -439,9 +484,20 @@ function ReportCard({
                 </tr>
               );
             })}
+            <tr className="border-b border-zinc-100 last:border-0">
+              <td className="py-2 pr-3 text-zinc-800">{carrierLabel}</td>
+              <td className="py-2 pr-3 text-zinc-600">-</td>
+              <td className="py-2 pr-3 text-zinc-600">-</td>
+              <td className="py-2 pr-3 text-right font-medium text-zinc-900">
+                {formatNumber(tasiyici)} kg
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-right text-xs text-zinc-400">
+        {carrierLabel}: reçetenin %{formatNumber(carrierSharePercent, 2)}&apos;i
+      </p>
     </section>
   );
 }
@@ -451,11 +507,13 @@ function SummaryCard({
   tasiyici,
   totalKg,
   tasiyiciNegatif,
+  carrierLabel,
 }: {
   toplamHammadde: number;
   tasiyici: number;
   totalKg: number;
   tasiyiciNegatif: boolean;
+  carrierLabel: string;
 }) {
   return (
     <section
@@ -467,7 +525,7 @@ function SummaryCard({
       <div className="flex flex-col gap-2 text-sm">
         <Row label="Toplam Hammadde" value={`${formatNumber(toplamHammadde)} kg`} />
         <Row
-          label="Taşıyıcı (Dolgu)"
+          label={carrierLabel}
           value={`${formatNumber(tasiyici)} kg`}
           valueClassName={tasiyiciNegatif ? "text-red-600" : undefined}
         />
@@ -493,9 +551,11 @@ function Row({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-zinc-600">{label}</span>
-      <span className={`font-semibold text-zinc-900 ${valueClassName ?? ""}`}>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <span className="min-w-0 break-words text-zinc-600">{label}</span>
+      <span
+        className={`shrink-0 font-semibold text-zinc-900 ${valueClassName ?? ""}`}
+      >
         {value}
       </span>
     </div>

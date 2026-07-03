@@ -110,6 +110,12 @@ export function calculateRecipe(
   return { totalKg, results, toplamHammadde, tasiyici };
 }
 
+// Taşıyıcı madde adı boşsa "Taşıyıcı", doluysa "Taşıyıcı(Mısır Unu)" gibi yazılır.
+export function getCarrierLabel(carrierName: string): string {
+  const trimmed = carrierName.trim();
+  return trimmed ? `Taşıyıcı(${trimmed})` : "Taşıyıcı";
+}
+
 export function formatNumber(value: number, decimals = 3): string {
   if (!Number.isFinite(value)) return "-";
   return value.toLocaleString("tr-TR", {
