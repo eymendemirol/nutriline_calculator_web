@@ -41,10 +41,29 @@ async function loadRobotoFont(doc: jsPDF): Promise<boolean> {
   }
 }
 
+const TURKISH_TO_ASCII: Record<string, string> = {
+  ç: "c",
+  Ç: "C",
+  ğ: "g",
+  Ğ: "G",
+  ı: "i",
+  İ: "I",
+  ö: "o",
+  Ö: "O",
+  ş: "s",
+  Ş: "S",
+  ü: "u",
+  Ü: "U",
+};
+
+// Dosya adları bazı paylaşım kanallarında (ör. WhatsApp) Türkçe karaktererle
+// sorun çıkarabildiğinden, dosya adını ASCII'ye çeviriyoruz. PDF içeriğindeki
+// Türkçe metinler bundan etkilenmez, olduğu gibi kalır.
 export function sanitizeFilename(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "nutriline-recete-raporu";
-  return trimmed
+  const ascii = trimmed.replace(/[çÇğĞıİöÖşŞüÜ]/g, (ch) => TURKISH_TO_ASCII[ch] ?? ch);
+  return ascii
     .replace(/[\\/:*?"<>|]/g, "")
     .replace(/\s+/g, "-")
     .slice(0, 80);

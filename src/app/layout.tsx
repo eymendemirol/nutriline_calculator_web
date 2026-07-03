@@ -12,10 +12,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "Nutriline Reçete Hesaplayıcı";
+const description =
+  "Nutriline Yem ve Besin Katkıları için premiks reçete hesaplama uygulaması.";
+
 export const metadata: Metadata = {
-  title: "Nutriline Reçete Hesaplayıcı",
-  description:
-    "Nutriline Yem ve Besin Katkıları için premiks reçete hesaplama uygulaması.",
+  metadataBase: new URL("https://nutriline-calculator-web.vercel.app"),
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    siteName: title,
+    locale: "tr_TR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
