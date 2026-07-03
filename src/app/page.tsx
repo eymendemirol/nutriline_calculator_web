@@ -1,65 +1,478 @@
-import Image from "next/image";
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  BASE_UNIT_OPTIONS,
+  CONTENT_UNIT_OPTIONS,
+  ContentUnit,
+  Ingredient,
+  RecipeSettings,
+  TOTAL_UNIT_OPTIONS,
+  UNIT_LABELS,
+  WeightUnit,
+  calculateRecipe,
+  createIngredient,
+  formatNumber,
+} from "@/lib/calc";
+import { formatThousands, handleFormattedNumberChange } from "@/lib/format";
+import { shareOrDownloadPdf } from "@/lib/pdf";
+
+const numericInputClass =
+  "w-full rounded-l-lg border border-r-0 border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500";
+const unitSelectClass =
+  "rounded-r-lg border border-zinc-300 bg-zinc-50 px-2 py-2 text-sm text-zinc-600 focus:outline-none focus:ring-2 focus:ring-teal-500";
+const fieldLabelClass = "mb-1 block text-sm font-medium text-zinc-700";
 
 export default function Home() {
+  const [recipeName, setRecipeName] = useState("");
+  const [settings, setSettings] = useState<RecipeSettings>({
+    baseAmount: "2",
+    baseUnit: "kg",
+    totalAmount: "1000",
+    totalUnit: "kg",
+  });
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const { results, toplamHammadde, tasiyici, totalKg } = useMemo(
+    () => calculateRecipe(ingredients, settings),
+    [ingredients, settings]
+  );
+
+  const tasiyiciNegatif = totalKg > 0 && tasiyici < 0;
+
+  function addIngredient() {
+    setIngredients((prev) => [...prev, createIngredient()]);
+  }
+
+  function removeIngredient(id: string) {
+    setIngredients((prev) => prev.filter((ing) => ing.id !== id));
+  }
+
+  function updateIngredient(id: string, patch: Partial<Ingredient>) {
+    setIngredients((prev) =>
+      prev.map((ing) => (ing.id === id ? { ...ing, ...patch } : ing))
+    );
+  }
+
+  async function handleShare() {
+    setShareError(null);
+    setSharing(true);
+    try {
+      await shareOrDownloadPdf(ingredients, settings, recipeName);
+    } catch {
+      setShareError("Rapor oluşturulurken bir sorun oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="min-h-full bg-zinc-50">
+      <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
+        <header className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.jpg"
+            alt="Nutriline logo"
+            className="h-12 w-12 rounded-full object-cover"
+          />
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900">
+              Nutriline Reçete Hesaplayıcı
+            </h1>
+            <p className="text-sm text-zinc-500">
+              Premiks reçetelerindeki hammadde ve taşıyıcı miktarlarını hesaplayın.
+            </p>
+          </div>
+        </header>
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <label className={fieldLabelClass}>Reçete Adı</label>
+          <input
+            type="text"
+            placeholder="Örn: Broiler Başlangıç Yemi Premiksi"
+            value={recipeName}
+            onChange={(e) => setRecipeName(e.target.value)}
+            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+          <p className="mt-1 text-xs text-zinc-400">
+            Bu isim PDF raporunun başlığında ve dosya adında kullanılır.
+          </p>
+        </section>
+
+        <SettingsCard settings={settings} onChange={setSettings} />
+
+        <IngredientsCard
+          ingredients={ingredients}
+          onAdd={addIngredient}
+          onRemove={removeIngredient}
+          onChange={updateIngredient}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+
+        {ingredients.length > 0 && (
+          <>
+            <ReportCard
+              ingredients={ingredients}
+              results={results}
+              onShare={handleShare}
+              sharing={sharing}
+              shareError={shareError}
+            />
+            <SummaryCard
+              toplamHammadde={toplamHammadde}
+              tasiyici={tasiyici}
+              totalKg={totalKg}
+              tasiyiciNegatif={tasiyiciNegatif}
+            />
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function SettingsCard({
+  settings,
+  onChange,
+}: {
+  settings: RecipeSettings;
+  onChange: (s: RecipeSettings) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-1 text-base font-semibold text-zinc-900">Reçete Ayarları</h2>
+      <p className="mb-4 text-sm text-zinc-500">
+        Etken madde değerlerinin hangi miktar için geçerli olduğunu ve toplam ne kadar
+        üretim yapılacağını belirtin.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={fieldLabelClass}>Referans Miktar</label>
+          <div className="flex">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Örn: 2"
+              value={formatThousands(settings.baseAmount)}
+              onChange={(e) =>
+                handleFormattedNumberChange(e, (raw) =>
+                  onChange({ ...settings, baseAmount: raw })
+                )
+              }
+              className={numericInputClass}
+            />
+            <select
+              value={settings.baseUnit}
+              onChange={(e) =>
+                onChange({ ...settings, baseUnit: e.target.value as WeightUnit })
+              }
+              className={unitSelectClass}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              {BASE_UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {UNIT_LABELS[u]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Etiketteki içerik değerleri &quot;her 2 kg&quot;da veriliyorsa buraya 2 kg
+            girin.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+        <div>
+          <label className={fieldLabelClass}>Toplam Üretim Miktarı</label>
+          <div className="flex">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Örn: 1.000"
+              value={formatThousands(settings.totalAmount)}
+              onChange={(e) =>
+                handleFormattedNumberChange(e, (raw) =>
+                  onChange({ ...settings, totalAmount: raw })
+                )
+              }
+              className={numericInputClass}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <select
+              value={settings.totalUnit}
+              onChange={(e) =>
+                onChange({ ...settings, totalUnit: e.target.value as WeightUnit })
+              }
+              className={unitSelectClass}
+            >
+              {TOTAL_UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {UNIT_LABELS[u]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-xs text-zinc-400">Reçetenin toplam üretim miktarı.</p>
+            <button
+              type="button"
+              onClick={() => onChange({ ...settings, totalAmount: "1", totalUnit: "ton" })}
+              className="text-xs font-medium text-teal-700 hover:underline"
+            >
+              1 Ton olarak ayarla
+            </button>
+          </div>
         </div>
-      </main>
+      </div>
+    </section>
+  );
+}
+
+function IngredientsCard({
+  ingredients,
+  onAdd,
+  onRemove,
+  onChange,
+}: {
+  ingredients: Ingredient[];
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  onChange: (id: string, patch: Partial<Ingredient>) => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="mb-1 flex items-center justify-between">
+        <h2 className="text-base font-semibold text-zinc-900">Etken Maddeler</h2>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="rounded-lg bg-teal-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-800"
+        >
+          + Etken Madde Ekle
+        </button>
+      </div>
+      <p className="mb-4 text-sm text-zinc-500">
+        Reçeteye eklemek istediğiniz her etken madde için içerik miktarını ve
+        kullanılacak hammaddenin saflık oranını girin.
+      </p>
+
+      {ingredients.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-zinc-300 py-10 text-center text-sm text-zinc-400">
+          Henüz etken madde eklenmedi. Başlamak için &quot;+ Etken Madde Ekle&quot;
+          butonuna tıklayın.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {ingredients.map((ing, index) => (
+            <IngredientRow
+              key={ing.id}
+              index={index}
+              ingredient={ing}
+              onRemove={() => onRemove(ing.id)}
+              onChange={(patch) => onChange(ing.id, patch)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function IngredientRow({
+  index,
+  ingredient,
+  onRemove,
+  onChange,
+}: {
+  index: number;
+  ingredient: Ingredient;
+  onRemove: () => void;
+  onChange: (patch: Partial<Ingredient>) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-700 text-xs font-semibold text-white">
+          {index + 1}
+        </span>
+        <input
+          type="text"
+          placeholder="Etken madde adı (Örn: Çinko)"
+          value={ingredient.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Etken maddeyi sil"
+          className="shrink-0 rounded-lg border border-red-200 px-2.5 py-2 text-red-500 hover:bg-red-50"
+        >
+          Sil
+        </button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className={fieldLabelClass}>İçerik Miktarı</label>
+          <div className="flex">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Örn: 110.000"
+              value={formatThousands(ingredient.amount)}
+              onChange={(e) =>
+                handleFormattedNumberChange(e, (raw) => onChange({ amount: raw }))
+              }
+              className={numericInputClass}
+            />
+            <select
+              value={ingredient.amountUnit}
+              onChange={(e) => onChange({ amountUnit: e.target.value as ContentUnit })}
+              className={unitSelectClass}
+            >
+              {CONTENT_UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u}>
+                  {UNIT_LABELS[u]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className={fieldLabelClass}>Hammadde Saflığı</label>
+          <div className="flex">
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Örn: 60"
+              value={ingredient.purity}
+              onChange={(e) => onChange({ purity: e.target.value })}
+              className={numericInputClass}
+            />
+            <span className={unitSelectClass}>%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportCard({
+  ingredients,
+  results,
+  onShare,
+  sharing,
+  shareError,
+}: {
+  ingredients: Ingredient[];
+  results: ReturnType<typeof calculateRecipe>["results"];
+  onShare: () => void;
+  sharing: boolean;
+  shareError: string | null;
+}) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold text-zinc-900">Reçete Raporu</h2>
+        <button
+          type="button"
+          onClick={onShare}
+          disabled={sharing}
+          className="rounded-lg border border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50"
+        >
+          {sharing ? "Hazırlanıyor..." : "PDF Olarak İndir / Paylaş"}
+        </button>
+      </div>
+      <p className="mb-4 text-sm text-zinc-500">
+        Girilen tüm etken maddelere göre hesaplanan hammadde miktarları.
+      </p>
+      {shareError && (
+        <p className="mb-3 text-sm text-red-600">{shareError}</p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 text-left text-zinc-500">
+              <th className="py-2 pr-3 font-medium">Etken Madde</th>
+              <th className="py-2 pr-3 font-medium">Girilen İçerik</th>
+              <th className="py-2 pr-3 font-medium">Saflık</th>
+              <th className="py-2 pr-3 font-medium text-right">Hammadde Miktarı</th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((r, i) => {
+              const ing = ingredients[i];
+              return (
+                <tr key={r.id} className="border-b border-zinc-100 last:border-0">
+                  <td className="py-2 pr-3 text-zinc-800">{r.name}</td>
+                  <td className="py-2 pr-3 text-zinc-600">
+                    {formatThousands(ing.amount) || "0"} {UNIT_LABELS[ing.amountUnit]}
+                  </td>
+                  <td className="py-2 pr-3 text-zinc-600">%{ing.purity || "0"}</td>
+                  <td className="py-2 pr-3 text-right font-medium text-zinc-900">
+                    {formatNumber(r.amountKg)} kg
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SummaryCard({
+  toplamHammadde,
+  tasiyici,
+  totalKg,
+  tasiyiciNegatif,
+}: {
+  toplamHammadde: number;
+  tasiyici: number;
+  totalKg: number;
+  tasiyiciNegatif: boolean;
+}) {
+  return (
+    <section
+      className={`rounded-2xl border p-5 shadow-sm ${
+        tasiyiciNegatif ? "border-red-200 bg-red-50" : "border-teal-200 bg-teal-50"
+      }`}
+    >
+      <h2 className="mb-3 text-base font-semibold text-zinc-900">Sonuç</h2>
+      <div className="flex flex-col gap-2 text-sm">
+        <Row label="Toplam Hammadde" value={`${formatNumber(toplamHammadde)} kg`} />
+        <Row
+          label="Taşıyıcı (Dolgu)"
+          value={`${formatNumber(tasiyici)} kg`}
+          valueClassName={tasiyiciNegatif ? "text-red-600" : undefined}
+        />
+        <Row label="Toplam Üretim" value={`${formatNumber(totalKg)} kg`} />
+      </div>
+      {tasiyiciNegatif && (
+        <p className="mt-3 text-sm text-red-600">
+          Uyarı: Hammadde toplamı, toplam üretim miktarını aşıyor. Referans miktarı,
+          saflık değerlerini veya toplam üretimi kontrol edin.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Row({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-zinc-600">{label}</span>
+      <span className={`font-semibold text-zinc-900 ${valueClassName ?? ""}`}>
+        {value}
+      </span>
     </div>
   );
 }
