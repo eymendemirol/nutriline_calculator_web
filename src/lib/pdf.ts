@@ -192,6 +192,18 @@ export async function buildRecipePdf(
   return doc.output("blob");
 }
 
+// Windows'ta tarayıcıların yerleşik paylaşım menüsü, dosyaları geçici bir
+// konuma kopyalarken bazı uygulamalara (ör. Outlook) "dosya boş" hatası ile
+// aktarabiliyor. Bu yüzden paylaşım sayfası sadece mobil cihazlarda (WhatsApp
+// vb. paylaşım için) deneniyor; masaüstünde doğrudan indirme yapılıyor.
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } })
+    .userAgentData;
+  if (uaData && typeof uaData.mobile === "boolean") return uaData.mobile;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export async function shareOrDownloadPdf(
   ingredients: Ingredient[],
   settings: RecipeSettings,
@@ -207,7 +219,7 @@ export async function shareOrDownloadPdf(
     share?: (data: ShareData) => Promise<void>;
   };
 
-  if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+  if (isMobileDevice() && nav.canShare && nav.share && nav.canShare({ files: [file] })) {
     try {
       await nav.share({
         files: [file],
