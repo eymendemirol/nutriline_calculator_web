@@ -12,8 +12,10 @@ import {
   WeightUnit,
   calculateRecipe,
   createIngredient,
+  formatIngredientAmount,
   formatNumber,
   getCarrierLabel,
+  isPotencyUnit,
 } from "@/lib/calc";
 import { downloadRecipeCsv } from "@/lib/csv";
 import { formatThousands, handleFormattedNumberChange } from "@/lib/format";
@@ -365,7 +367,9 @@ function IngredientRow({
             <input
               type="text"
               inputMode="decimal"
-              placeholder="Örn: 110.000"
+              placeholder={
+                isPotencyUnit(ingredient.amountUnit) ? "Örn: 7.200.000" : "Örn: 110.000"
+              }
               value={formatThousands(ingredient.amount)}
               onChange={(e) =>
                 handleFormattedNumberChange(e, (raw) => onChange({ amount: raw }))
@@ -386,17 +390,23 @@ function IngredientRow({
           </div>
         </div>
         <div>
-          <label className={fieldLabelClass}>Hammadde Saflığı</label>
+          <label className={fieldLabelClass}>
+            {isPotencyUnit(ingredient.amountUnit) ? "Hammadde Potensi" : "Hammadde Saflığı"}
+          </label>
           <div className="flex">
             <input
               type="text"
               inputMode="decimal"
-              placeholder="Örn: 60"
-              value={ingredient.purity}
-              onChange={(e) => onChange({ purity: e.target.value })}
+              placeholder={isPotencyUnit(ingredient.amountUnit) ? "Örn: 1.000.000" : "Örn: 60"}
+              value={formatThousands(ingredient.purity)}
+              onChange={(e) =>
+                handleFormattedNumberChange(e, (raw) => onChange({ purity: raw }))
+              }
               className={numericInputClass}
             />
-            <span className={unitSelectClass}>%</span>
+            <span className={unitSelectClass}>
+              {isPotencyUnit(ingredient.amountUnit) ? "I.U./g" : "%"}
+            </span>
           </div>
         </div>
       </div>
@@ -471,15 +481,20 @@ function ReportCard({
           <tbody>
             {results.map((r, i) => {
               const ing = ingredients[i];
+              const potency = isPotencyUnit(ing.amountUnit);
               return (
                 <tr key={r.id} className="border-b border-zinc-100 last:border-0">
                   <td className="py-2 pr-3 text-zinc-800">{r.name}</td>
                   <td className="py-2 pr-3 text-zinc-600">
                     {formatThousands(ing.amount) || "0"} {UNIT_LABELS[ing.amountUnit]}
                   </td>
-                  <td className="py-2 pr-3 text-zinc-600">%{ing.purity || "0"}</td>
+                  <td className="py-2 pr-3 text-zinc-600">
+                    {potency
+                      ? `${formatThousands(ing.purity) || "0"} I.U./g`
+                      : `%${ing.purity || "0"}`}
+                  </td>
                   <td className="py-2 pr-3 text-right font-medium text-zinc-900">
-                    {formatNumber(r.amountKg)} kg
+                    {formatIngredientAmount(r.amountKg, ing.amountUnit)}
                   </td>
                 </tr>
               );

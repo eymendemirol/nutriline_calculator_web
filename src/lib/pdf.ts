@@ -5,8 +5,10 @@ import {
   RecipeSettings,
   UNIT_LABELS,
   calculateRecipe,
+  formatIngredientAmount,
   formatNumber,
   getCarrierLabel,
+  isPotencyUnit,
 } from "./calc";
 import { formatThousands } from "./format";
 
@@ -129,19 +131,20 @@ export async function buildRecipePdf(
         "Etken Madde",
         "Girilen İçerik",
         "Hammadde Saflığı",
-        "Hammadde Miktarı (kg)",
+        "Hammadde Miktarı",
         "Reçetedeki Oranı",
       ],
     ],
     body: [
       ...results.map((r, i) => {
         const ing = ingredients[i];
+        const potency = isPotencyUnit(ing.amountUnit);
         return [
           String(i + 1),
           r.name,
           `${formatThousands(ing.amount) || "0"} ${UNIT_LABELS[ing.amountUnit]}`,
-          `%${ing.purity || "0"}`,
-          formatNumber(r.amountKg),
+          potency ? `${formatThousands(ing.purity) || "0"} I.U./g` : `%${ing.purity || "0"}`,
+          formatIngredientAmount(r.amountKg, ing.amountUnit),
           `%${formatNumber(r.sharePercent, 2)}`,
         ];
       }),
@@ -150,7 +153,7 @@ export async function buildRecipePdf(
         getCarrierLabel(carrierName),
         "-",
         "-",
-        formatNumber(tasiyici),
+        `${formatNumber(tasiyici)} kg`,
         `%${formatNumber(totalKg > 0 ? (tasiyici / totalKg) * 100 : 0, 2)}`,
       ],
     ],

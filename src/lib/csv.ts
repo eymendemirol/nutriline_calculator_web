@@ -26,6 +26,9 @@ export function buildRecipeCsv(
     settings
   );
 
+  // Miktar sütunu her zaman kg cinsindendir (tek birim, makine tarafından
+  // okunabilir olması için); vitamin gibi gram mertebesindeki küçük miktarların
+  // yuvarlamayla kaybolmaması için 6 ondalık basamak kullanılır.
   const lines: string[] = [];
   lines.push(`Recete Adi;${recipeName.trim() || "Isimsiz Recete"}`);
   lines.push(`Toplam Uretim (kg);${formatNumber(totalKg)}`);
@@ -34,13 +37,13 @@ export function buildRecipeCsv(
 
   results.forEach((r, i) => {
     lines.push(
-      `${i + 1};${r.name};${formatNumber(r.amountKg)};${formatNumber(r.sharePercent, 2)}`
+      `${i + 1};${r.name};${formatNumber(r.amountKg, 6)};${formatNumber(r.sharePercent, 2)}`
     );
   });
 
   const tasiyiciSharePercent = totalKg > 0 ? (tasiyici / totalKg) * 100 : 0;
   lines.push(
-    `${results.length + 1};${getCarrierLabel(carrierName)};${formatNumber(tasiyici)};${formatNumber(tasiyiciSharePercent, 2)}`
+    `${results.length + 1};${getCarrierLabel(carrierName)};${formatNumber(tasiyici, 6)};${formatNumber(tasiyiciSharePercent, 2)}`
   );
 
   lines.push("");

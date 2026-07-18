@@ -1,16 +1,25 @@
-export type ContentUnit = "mg" | "g" | "kg";
+export type ContentUnit = "mcg" | "mg" | "g" | "kg" | "IU";
 export type WeightUnit = "g" | "kg" | "ton";
 
-export const CONTENT_UNIT_OPTIONS: ContentUnit[] = ["mg", "g", "kg"];
+export const CONTENT_UNIT_OPTIONS: ContentUnit[] = ["mcg", "mg", "g", "kg", "IU"];
 export const BASE_UNIT_OPTIONS: WeightUnit[] = ["g", "kg"];
 export const TOTAL_UNIT_OPTIONS: WeightUnit[] = ["kg", "ton"];
 
 export const UNIT_LABELS: Record<ContentUnit | WeightUnit, string> = {
+  mcg: "mcg",
   mg: "mg",
   g: "g",
   kg: "kg",
+  IU: "I.U.",
   ton: "ton",
 };
+
+// Vitaminler gibi I.U. (Uluslararası Ünite) ile ölçülen etken maddelerde
+// hammadde saflığı yüzde yerine "I.U./g" potens olarak verilir; mg tabanlı
+// yüzde formülü bu durumda geçerli değildir.
+export function isPotencyUnit(unit: ContentUnit): boolean {
+  return unit === "IU";
+}
 
 export interface Ingredient {
   id: string;
@@ -49,8 +58,10 @@ export function parseNumber(input: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function toMilligrams(value: number, unit: ContentUnit): number {
+export function toMilligrams(value: number, unit: Exclude<ContentUnit, "IU">): number {
   switch (unit) {
+    case "mcg":
+      return value / 1000;
     case "mg":
       return value;
     case "g":
@@ -71,16 +82,27 @@ export function toKilograms(value: number, unit: WeightUnit): number {
   }
 }
 
-// Hammadde miktarı (kg) = (mg / (saflık/100)) * (toplamKg / bazKg) / 1.000.000
+// Yüzde saflık modu (mg/g/kg): hammadde (kg) = (mg / (saflık/100)) * (toplamKg / bazKg) / 1.000.000
+// Potens modu (I.U.): hammadde (kg) = ((I.U. / (I.U./g potens)) * (toplamKg / bazKg)) / 1.000 (g -> kg)
 export function calculateIngredientKg(
   ingredient: Ingredient,
   settings: RecipeSettings
 ): number {
   const baseKg = toKilograms(parseNumber(settings.baseAmount), settings.baseUnit);
   const totalKg = toKilograms(parseNumber(settings.totalAmount), settings.totalUnit);
-  const mg = toMilligrams(parseNumber(ingredient.amount), ingredient.amountUnit);
   const purity = parseNumber(ingredient.purity);
   if (baseKg <= 0 || purity <= 0 || totalKg <= 0) return 0;
+
+  if (isPotencyUnit(ingredient.amountUnit)) {
+    const iu = parseNumber(ingredient.amount);
+    const grams = (iu / purity) * (totalKg / baseKg);
+    return grams / 1000;
+  }
+
+  const mg = toMilligrams(
+    parseNumber(ingredient.amount),
+    ingredient.amountUnit as Exclude<ContentUnit, "IU">
+  );
   return ((mg / (purity / 100)) * (totalKg / baseKg)) / 1_000_000;
 }
 
@@ -122,4 +144,14 @@ export function formatNumber(value: number, decimals = 3): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+}
+
+// Vitaminler gibi I.U. tabanlı maddelerde miktar genellikle gram, mineral gibi
+// mg/g/kg tabanlı maddelerde ise kg cinsinden okunur; bu, hammadde miktarını
+// girilen birime göre en doğal ölçekte gösterir.
+export function formatIngredientAmount(amountKg: number, unit: ContentUnit): string {
+  if (isPotencyUnit(unit)) {
+    return `${formatNumber(amountKg * 1000, 3)} g`;
+  }
+  return `${formatNumber(amountKg, 3)} kg`;
 }
