@@ -146,12 +146,6 @@ export function formatNumber(value: number, decimals = 3): string {
   });
 }
 
-// Vitaminler gibi I.U. tabanlı maddelerde miktar genellikle gram, mineral gibi
-// mg/g/kg tabanlı maddelerde ise kg cinsinden okunur; bu, hammadde miktarını
-// girilen birime göre en doğal ölçekte gösterir.
-export function formatIngredientAmount(amountKg: number, unit: ContentUnit): string {
-  if (isPotencyUnit(unit)) {
-    return `${formatNumber(amountKg * 1000, 3)} g`;
-  }
+export function formatIngredientAmount(amountKg: number): string {
   return `${formatNumber(amountKg, 3)} kg`;
 }

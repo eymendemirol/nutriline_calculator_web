@@ -144,7 +144,7 @@ export async function buildRecipePdf(
           r.name,
           `${formatThousands(ing.amount) || "0"} ${UNIT_LABELS[ing.amountUnit]}`,
           potency ? `${formatThousands(ing.purity) || "0"} I.U./g` : `%${ing.purity || "0"}`,
-          formatIngredientAmount(r.amountKg, ing.amountUnit),
+          formatIngredientAmount(r.amountKg),
           `%${formatNumber(r.sharePercent, 2)}`,
         ];
       }),

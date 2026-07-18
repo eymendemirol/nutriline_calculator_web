@@ -494,7 +494,7 @@ function ReportCard({
                       : `%${ing.purity || "0"}`}
                   </td>
                   <td className="py-2 pr-3 text-right font-medium text-zinc-900">
-                    {formatIngredientAmount(r.amountKg, ing.amountUnit)}
+                    {formatIngredientAmount(r.amountKg)}
                   </td>
                 </tr>
               );
